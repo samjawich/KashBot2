@@ -6,6 +6,12 @@ var restify = require('restify');
 var builder = require('botbuilder');
 
 var Client = require('coinbase').Client;
+var cbClient = new Client({
+  'apiKey': 'tVjOciCzNUr2DZly',
+  'apiSecret': 'iA89VSplTj7LChsP8cfOGsGl5DEKiCi2',
+  'version':'2017-09-16'
+});
+
 var xecdApiClient = require('@xe/xecd-rates-client')
 
 var xecdConfig = {
@@ -56,26 +62,58 @@ bot.dialog('/', intents);
 intents.matches('Send', function(session, args, next) {
     var name = builder.EntityRecognizer.findEntity(args.entities, 'recipient').entity;
     var amount = builder.EntityRecognizer.findEntity(args.entities, 'amount').entity;
-    session.send(name);
+    var primaryAccount;
     
-    xeClient.convertFrom(function(err,data){
-        session.send("Sending " + data.to[0].mid + " BTC to " + name);
-    }, "CAD", "XBT", amount);
+    cbClient.getAccounts({}, function(err, accounts) {
+        accounts.forEach(function(acct) {
+            if (acct.name == "BTC Wallet") {
+                primaryAccount = acct;
+            }
+        });
+
+        xeClient.convertFrom(function(err,data) {
+            var truncatedAmount = Math.floor(data.to[0].mid * 100000000) / 100000000;
+            primaryAccount.createAddress(null, function(err, address) {
+                primaryAccount.sendMoney({
+                    'to': "kallentu@hotmail.ca",
+                    'amount': '0.0002',
+                    'currency': "BTC",
+                }, function(error, tx) {
+                   if (!error) {
+                       session.send("Ok, I'm sending " + truncatedAmount + " BTC to " + name);
+                       session.send("Transaction successful!");
+                   } else {
+                       session.send("Something went wrong :(");
+                       session.send("Please try again later.");
+                   }
+                });
+         });
+        }, "CAD", "XBT", amount);
+    });
     
-    //Check firebase database to see if that name exists.
-    //  if it does, get the wallet ID and send.
-    //  if not
-        //Ask for wallet ID
-        //Make new DB record 
-        //Send money
-    
-    //session.send(session);
+})
+
+intents.matches('Balance', function(session) {
+    cbClient.getAccounts({}, function(err, accounts) {
+        accounts.forEach(function(acct) {
+            if (acct.balance.currency == "BTC" && acct.name == "BTC Wallet") {
+                session.send(acct.name + ': ' + acct.balance.amount + ' ' + acct.balance.currency);
+            }
+        });
+    });
 })
 
 intents.matches('Rate', function(session) {
     xeClient.convertFrom(function(err,data){
         session.send("1 CAD = " + data.to[0].mid + " BTC");
     }, "CAD", "XBT");
+})
+
+intents.matches('Help', function(session) {
+    session.send("Here's what I can do:");
+    session.send("Send money to someone by telling me the name and amount");
+    session.send("Tell you the current exchange rate");
+    session.send("Tell you your Coinbase balance");
 })
 
 intents.matches('Hi', function (session) {
@@ -85,6 +123,3 @@ intents.matches('Hi', function (session) {
 intents.onDefault((session) => {
     session.send('Sorry, I did not understand \'%s\'.', session.message.text);
 });
-
- 
-
