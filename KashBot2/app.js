@@ -7,8 +7,8 @@ var builder = require('botbuilder');
 
 var Client = require('coinbase').Client;
 var cbClient = new Client({
-  'apiKey': 'tVjOciCzNUr2DZly',
-  'apiSecret': 'iA89VSplTj7LChsP8cfOGsGl5DEKiCi2',
+  'apiKey': '',
+  'apiSecret': '',
   'version':'2017-09-16'
 });
 
