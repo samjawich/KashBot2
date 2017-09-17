@@ -5,15 +5,15 @@ A simple echo bot for the Microsoft Bot Framework.
 var restify = require('restify');
 var builder = require('botbuilder');
 var config = {
-  apiKey: "AIzaSyCCe5Qcpoj-iAAe_TX3QRR2zheoxGtKco4",
-  authDomain: "project-85732081961.firebaseapp.com",
+  apiKey: "",
+  authDomain: "",
   databaseURL: "https://htnBot.firebaseio.com",
   storageBucket: "gs://htnbot.appspot.com",
 };
 var Client = require('coinbase').Client;
 var cbClient = new Client({
-  'apiKey': 'tVjOciCzNUr2DZly',
-  'apiSecret': 'iA89VSplTj7LChsP8cfOGsGl5DEKiCi2',
+  'apiKey': '',
+  'apiSecret': '',
   'version':'2017-09-16'
 });
 var firebase = require("firebase");
@@ -22,8 +22,8 @@ firebase.initializeApp(config);
 var xecdApiClient = require('@xe/xecd-rates-client')
 
 var xecdConfig = {
-  username: 'kashbot100261902',
-  password: '4jh97ep2863amuek9e926jndn1',
+  username: '',
+  password: '',
   apiUrl: 'https://xecdapi.xe.com/v1/'
 };
 
