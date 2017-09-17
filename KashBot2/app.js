@@ -1,16 +1,23 @@
 /*-----------------------------------------------------------------------------
-A simple echo bot for the Microsoft Bot Framework. 
+A simple echo bot for the Microsoft Bot Framework.
 -----------------------------------------------------------------------------*/
 
 var restify = require('restify');
 var builder = require('botbuilder');
-
+var config = {
+  apiKey: "AIzaSyCCe5Qcpoj-iAAe_TX3QRR2zheoxGtKco4",
+  authDomain: "project-85732081961.firebaseapp.com",
+  databaseURL: "https://htnBot.firebaseio.com",
+  storageBucket: "gs://htnbot.appspot.com",
+};
 var Client = require('coinbase').Client;
 var cbClient = new Client({
-  'apiKey': '',
-  'apiSecret': '',
+  'apiKey': 'tVjOciCzNUr2DZly',
+  'apiSecret': 'iA89VSplTj7LChsP8cfOGsGl5DEKiCi2',
   'version':'2017-09-16'
 });
+var firebase = require("firebase");
+firebase.initializeApp(config);
 
 var xecdApiClient = require('@xe/xecd-rates-client')
 
@@ -57,26 +64,37 @@ const LuisModelUrl = 'https://' + luisAPIHostName + '/luis/v1/application?id=' +
 
 // Main dialog with LUIS
 var recognizer = new builder.LuisRecognizer(LuisModelUrl);
-var intents = new builder.IntentDialog({ recognizers: [recognizer] })
-bot.dialog('/', intents);   
+var intents = new builder.IntentDialog({ recognizers: [recognizer] });
+
+bot.dialog('/', intents); 
+
+
 intents.matches('Send', function(session, args, next) {
     var name = builder.EntityRecognizer.findEntity(args.entities, 'recipient').entity;
     var amount = builder.EntityRecognizer.findEntity(args.entities, 'amount').entity;
+    session.send(name);
+    session.send(amount);
+    return;
     var primaryAccount;
-    
-    cbClient.getAccounts({}, function(err, accounts) {
-        accounts.forEach(function(acct) {
-            if (acct.name == "BTC Wallet") {
-                primaryAccount = acct;
-            }
+    var email;
+    function getwallet(name) {
+     var database = firebase.database();
+     firebase.database().ref('/users/'+name).once('value').then(function(snapshot) {
+     if (snapshot.val()!==null) {
+        email=snapshot.val().wallet;
+        cbClient.getAccounts({}, function(err, accounts) {
+            accounts.forEach(function(acct) {
+                if (acct.name == "BTC Wallet") {
+                    primaryAccount = acct;
+                }
         });
 
         xeClient.convertFrom(function(err,data) {
             var truncatedAmount = Math.floor(data.to[0].mid * 100000000) / 100000000;
             primaryAccount.createAddress(null, function(err, address) {
                 primaryAccount.sendMoney({
-                    'to': "kallentu@hotmail.ca",
-                    'amount': '0.0002',
+                    'to': email,
+                    'amount': truncatedAmount,
                     'currency': "BTC",
                 }, function(error, tx) {
                    if (!error) {
@@ -85,13 +103,67 @@ intents.matches('Send', function(session, args, next) {
                    } else {
                        session.send("Something went wrong :(");
                        session.send("Please try again later.");
+                       session.send(error);
                    }
                 });
          });
         }, "CAD", "XBT", amount);
     });
-    
+     }else{
+       session.send("I don't have that person in my records. Can you tell me their email?");
+       //send the name entered by user in an array
+       function writeUserData(name) {
+          firebase.database().ref('raw/').set({
+           data: name
+            });
+        }
+        writeUserData(name);
+     }
+     });
+
+    }
+    getwallet(name);
+   
 })
+
+// email intent
+intents.matches('Mail', function(session, args) {
+
+ var mail = args.entities[0].entity; 
+    function getStoredName() {
+      firebase.database().ref('/raw').once('value').then(function(snapshot) {
+        if (snapshot.val() && snapshot.val().data) {
+           var  nameToBeRegistered=snapshot.val().data;
+        //send the new user
+         function newuser(nameToBeRegistered,mail) {
+          firebase.database().ref('users/' + nameToBeRegistered).set({
+            name: nameToBeRegistered,
+             wallet: mail
+           });
+        }
+
+        newuser(nameToBeRegistered,mail) ;
+        session.send('Thanks! You can transfer to that contact now.');
+        }else{
+            session.send('error');
+        }
+      });
+    }
+getStoredName();
+});
+
+
+// intents.matches('Email', function(session) {
+//     writeUserData(name, email);
+// });
+
+// Writes into the FireBase DB
+// function writeUserData(name, email) {
+//   firebase.database().set({
+//     username: name,
+//     email: email,
+//   });
+// }
 
 intents.matches('Balance', function(session) {
     cbClient.getAccounts({}, function(err, accounts) {
@@ -101,25 +173,46 @@ intents.matches('Balance', function(session) {
             }
         });
     });
-})
+});
 
 intents.matches('Rate', function(session) {
     xeClient.convertFrom(function(err,data){
         session.send("1 CAD = " + data.to[0].mid + " BTC");
     }, "CAD", "XBT");
-})
+});
 
 intents.matches('Help', function(session) {
     session.send("Here's what I can do:");
-    session.send("Send money to someone by telling me the name and amount");
-    session.send("Tell you the current exchange rate");
-    session.send("Tell you your Coinbase balance");
-})
+    session.send("I can send BTC to someone if you tell me their name and the amount you're sending.");
+    session.send("I can also tell you the exchange rate of BTC.");
+    session.send("As well, I can tell you your current balance.");
+    session.send("And lastly, if you want to know more about Bitcoins, I can tell you about it.");
+});
+
+intents.matches('Info', function (session) {
+        session.send("So, you wanted to learn more about Bitcoin?");
+        session.send("Bitcoin is a digital and global currency. It allows people to send or receive money across the internet, even to people they don't know.");
+        session.send("The mathematical field of cryptography is the basis behind Bitcoins security.");
+        session.send("There are no physical pieces of Bitcoin, transfers with Bitcoin is documented by a receipt-type of address and a private key.");
+});
+
+intents.matches('Bye', function(session) {
+    var goodbyes = [
+        "See ya later!",
+        "Come back soon!",
+        "Have a good day!",
+        "Take care!",
+        "Bye!",
+        "So long!"        
+     ];
+    
+    session.send(goodbyes[Math.floor(Math.random() * goodbyes.length)]);
+});
 
 intents.matches('Hi', function (session) {
-    session.send("Hey! I'm your KashBot teller. How can I help you today?");
-})
+    session.send("Hey, I'm KashBot! Your Bitcoin teller. How can I help you today? Type 'Help' for options.");
+});
 
 intents.onDefault((session) => {
-    session.send('Sorry, I did not understand \'%s\'.', session.message.text);
+    session.send('Sorry, I did not understand \'%s\'. Can you try again?', session.message.text);
 });
